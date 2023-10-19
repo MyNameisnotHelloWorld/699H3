@@ -1,5 +1,6 @@
 import numpy as np
 import argparse
+from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -20,11 +21,11 @@ class BCModel(nn.Module):
             hidden = int(in_size/2)
         else:
             hidden = in_size
-        self.layer1 = nn.Linear(in_size, hidden)
+        self.layer1 = nn.Linear(in_size, 128)
         self.act1 = nn.ReLU()
-        self.layer2 = nn.Linear(hidden,out_size)
-        self.act2 = nn.Sigmoid()
-
+        self.layer2 = nn.Linear(128,256)
+        self.act2 = nn.ReLU()
+        self.layer3 = nn.Linear(256, out_size)
 
         ########## Your code ends here ##########
 
@@ -35,12 +36,13 @@ class BCModel(nn.Module):
         out1 = self.layer1(x)
         act_out1 = self.act1(out1)
         out2 = self.layer2(act_out1)
-        # act_out2 = self.act2(out2)
-        return out2
+        act_out2 = self.act2(out2)
+        out3 = self.layer3(act_out2)
+        return out3
         ########## Your code ends here ##########
 
 
-def run_training(data, args, dir_name):
+def run_training(data, args, dir_name,device):
     """
     Trains a feedforward NN.
     """
@@ -53,7 +55,7 @@ def run_training(data, args, dir_name):
     in_size = data["x_train"].shape[-1]
     out_size = data["y_train"].shape[-1]
 
-    bc_model = BCModel(in_size, out_size)
+    bc_model = BCModel(in_size, out_size).to(device)
 
     if args.restore:
         ckpt_path = (
@@ -77,7 +79,9 @@ def run_training(data, args, dir_name):
         At the end your code should return the scalar loss value.
         HINT: Remember, you can penalize steering (0th dimension) and throttle (1st dimension) unequally
         """
+        x = x.to(device)
         y_est = bc_model(x)
+
         if args.loss == "Huber":
 
             loss_f = nn.HuberLoss()
@@ -87,7 +91,7 @@ def run_training(data, args, dir_name):
         else:
 
             loss_f = nn.MSELoss()
-        loss = loss_f(y_est,y)
+        loss = loss_f(y_est.to(device),y.to(device))
         ########## Your code ends here ##########
         return loss
 
@@ -100,7 +104,8 @@ def run_training(data, args, dir_name):
     # run training
 
     bc_model.train()
-    for epoch in range(args.epochs):
+    pbar = tqdm(range(args.epochs), desc="Training", unit="epoch")
+    for epoch in pbar:
         epoch_loss = 0.0
 
         for x, y in dataloader:
@@ -112,13 +117,17 @@ def run_training(data, args, dir_name):
 
         epoch_loss /= len(dataloader)
 
-        print(f"Epoch {epoch + 1}, Loss: {epoch_loss}")
+        # print(f"Epoch {epoch + 1}, Loss: {epoch_loss}")
+        pbar.set_postfix(Loss=epoch_loss,The_epoch=epoch+1)
 
     ckpt_path = dir_name+"/" + args.scenario.lower() + "_" + args.goal.lower() + "_IL"
     torch.save(bc_model.state_dict(), ckpt_path)
 
 
 if __name__ == "__main__":
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -152,4 +161,4 @@ if __name__ == "__main__":
 
     data = load_data(args)
 
-    run_training(data, args, dir_name)
+    run_training(data, args, dir_name,device)
