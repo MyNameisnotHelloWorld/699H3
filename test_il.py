@@ -23,6 +23,13 @@ if __name__ == "__main__":
         help="left, straight, right, inner, outer, all",
         default="all",
     )
+
+    parser.add_argument(
+        "--loc",
+        type=str,
+        default="policies",
+    )
+
     parser.add_argument("--visualize", action="store_true", default=False)
     args = parser.parse_args()
     scenario_name = args.scenario.lower()
@@ -37,7 +44,7 @@ if __name__ == "__main__":
         )  # hmm, unreadable
 
     bc_model = BCModel(obs_sizes[scenario_name], 2)
-    ckpt_path = "./policies/" + scenario_name + "_" + args.goal.lower() + "_IL"
+    ckpt_path = "./"+args.loc+"/" + scenario_name + "_" + args.goal.lower() + "_IL"
     bc_model.load_state_dict(torch.load(ckpt_path))
 
     episode_number = 10 if args.visualize else 100

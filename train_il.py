@@ -40,7 +40,7 @@ class BCModel(nn.Module):
         ########## Your code ends here ##########
 
 
-def run_training(data, args):
+def run_training(data, args, dir_name):
     """
     Trains a feedforward NN.
     """
@@ -57,7 +57,7 @@ def run_training(data, args):
 
     if args.restore:
         ckpt_path = (
-            "./policies/" + args.scenario.lower() + "_" + args.goal.lower() + "_IL"
+            dir_name+"/" + args.scenario.lower() + "_" + args.goal.lower() + "_IL"
         )
         bc_model.load_state_dict(torch.load(ckpt_path))
 
@@ -85,7 +85,7 @@ def run_training(data, args):
 
             loss_f = nn.CrossEntropyLoss()
         else:
-            
+
             loss_f = nn.MSELoss()
         loss = loss_f(y_est,y)
         ########## Your code ends here ##########
@@ -114,7 +114,7 @@ def run_training(data, args):
 
         print(f"Epoch {epoch + 1}, Loss: {epoch_loss}")
 
-    ckpt_path = "./policies/" + args.scenario.lower() + "_" + args.goal.lower() + "_IL"
+    ckpt_path = dir_name+"/" + args.scenario.lower() + "_" + args.goal.lower() + "_IL"
     torch.save(bc_model.state_dict(), ckpt_path)
 
 
@@ -147,9 +147,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--restore", action="store_true", default=False)
     args = parser.parse_args()
-    dir_name = "./"+str(args.epochs)+"_epochs_"+str(args.lr)+"_lr_"+str(args.loss)+"_loss_policies"
+    dir_name = "./"+str(args.epochs)+"_epochs_"+str(args.lr)+"_lr_"+str(args.loss)+"_"+str(args.goal)+"_loss_policies"
     maybe_makedirs(dir_name)
 
     data = load_data(args)
 
-    run_training(data, args)
+    run_training(data, args, dir_name)
