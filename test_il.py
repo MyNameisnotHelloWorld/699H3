@@ -1,5 +1,6 @@
 import numpy as np
 from train_il import BCModel
+import os
 import gym_carlo
 import gym
 import time
@@ -71,4 +72,11 @@ if __name__ == "__main__":
                 if env.target_reached:
                     success_counter += 1
     if not args.visualize:
+        if os.path.exists("success.txt"):
+            with open("success.txt",'a') as file:
+                file.write("\n"+args.loc+" "+str(float(success_counter) / episode_number))
+        else:
+            with open("success.txt",'2') as file:
+                file.write(args.loc+" "+str(float(success_counter) / episode_number))
         print("Success Rate = " + str(float(success_counter) / episode_number))
+
