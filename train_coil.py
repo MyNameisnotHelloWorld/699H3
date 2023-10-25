@@ -19,35 +19,16 @@ class CoIL(nn.Module):
         # - in_size is dim(O)
         # - out_size is dim(A) = 2
         self.network = nn.Sequential(
-            nn.Linear(in_size+3, 64),
+            nn.Linear(in_size, 64),
             nn.ReLU(),
             nn.Linear(64, 128),
-            nn.Sigmoid(),
-            nn.Linear(128, out_size)
+            nn.ReLU(),
+            nn.Linear(128, 128)
         )
 
-        self.l_network = nn.Sequential(
-            nn.Linear(1, 64),
-            nn.ReLU(),
-            nn.Linear(64, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1)
-        )
-
-        self.s_network = nn.Sequential(
-            nn.Linear(1, 64),
-            nn.ReLU(),
-            nn.Linear(64, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1)
-        )
-
-        self.r_network = nn.Sequential(
-            nn.Linear(1, 64),
-            nn.ReLU(),
-            nn.Linear(64, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1)
+        self.out_net = nn.Sequential(
+            nn.Linear(129, out_size),
+            nn.Sigmoid()
         )
         ########## Your code ends here ##########
 
@@ -63,22 +44,10 @@ class CoIL(nn.Module):
 
             u = u.unsqueeze(1)
 
-        left = -1 * torch.ones_like(u).to(device)
-        straight = -1 * torch.ones_like(u).to(device)
-        right = -1 * torch.ones_like(u).to(device)
-        for i in range(0,len(u)):
-            if u[i] == 0:
-                left[i] = 0
-            if u[i] == 1:
-                straight[i] = 1
-            else:
-                right[i] = 2
+        n_x = self.network(x)
+        the_x = torch.cat((n_x,u),dim=1)
+        n_x = self.out_net(the_x)
 
-        new_left = self.l_network(left)
-        new_right = self.r_network(right)
-        new_straight = self.s_network(straight)
-        combined = torch.cat((x, new_left,new_right,new_straight), dim=1)
-        n_x = self.network(combined)
         return n_x
         ########## Your code ends here ##########
 
