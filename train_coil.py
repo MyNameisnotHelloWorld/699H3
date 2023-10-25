@@ -7,8 +7,9 @@ from utils import *
 import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 from torch.distributions.multivariate_normal import MultivariateNormal
+from tqdm import tqdm
 
-
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 class CoIL(nn.Module):
     def __init__(self, in_size, out_size):
         super(CoIL, self).__init__()
@@ -17,7 +18,37 @@ class CoIL(nn.Module):
         # We want to define and initialize the weights & biases of the CoIL network.
         # - in_size is dim(O)
         # - out_size is dim(A) = 2
+        self.network = nn.Sequential(
+            nn.Linear(in_size+3, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.Sigmoid(),
+            nn.Linear(128, out_size)
+        )
 
+        self.l_network = nn.Sequential(
+            nn.Linear(1, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1)
+        )
+
+        self.s_network = nn.Sequential(
+            nn.Linear(1, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1)
+        )
+
+        self.r_network = nn.Sequential(
+            nn.Linear(1, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1)
+        )
         ########## Your code ends here ##########
 
     def forward(self, x, u):
@@ -28,7 +59,27 @@ class CoIL(nn.Module):
         # FYI: For the intersection scenario, u=0 means the goal is to turn left, u=1 straight, and u=2 right.
         # HINT 1: Looping over all data samples may not be the most computationally efficient way of doing branching
         # HINT 2: While implementing this, we found tf.math.equal and tf.cast useful. This is not necessarily a requirement though.
+        if len(u.shape) == 1:
 
+            u = u.unsqueeze(1)
+
+        left = -1 * torch.ones_like(u).to(device)
+        straight = -1 * torch.ones_like(u).to(device)
+        right = -1 * torch.ones_like(u).to(device)
+        for i in range(0,len(u)):
+            if u[i] == 0:
+                left[i] = 0
+            if u[i] == 1:
+                straight[i] = 1
+            else:
+                right[i] = 2
+
+        new_left = self.l_network(left)
+        new_right = self.r_network(right)
+        new_straight = self.s_network(straight)
+        combined = torch.cat((x, new_left,new_right,new_straight), dim=1)
+        n_x = self.network(combined)
+        return n_x
         ########## Your code ends here ##########
 
 
@@ -45,7 +96,7 @@ def run_training(data, args):
     coil = CoIL(in_size, out_size)
     if args.restore:
         ckpt_path = (
-            "./policies/" + args.scenario.lower() + "_" + args.goal.lower() + "_ILDIST"
+            "./policies/" + args.scenario.lower() + "_" + args.goal.lower() + "_CoIL"
         )
         coil.load_state_dict(torch.load(ckpt_path))
 
@@ -65,7 +116,12 @@ def run_training(data, args):
         At the end your code should return the scalar loss value.
         HINT: Remember, you can penalize steering (0th dimension) and throttle (1st dimension) unequally
         """
-
+        r = coil(x.to(device),u.to(device)).to(device)
+        loss_f = nn.HuberLoss()
+        # print("================")
+        # print(r)
+        # print(y)
+        loss = loss_f(r,y)
         ########## Your code ends here ##########
         return loss
 
@@ -77,8 +133,8 @@ def run_training(data, args):
     dataloader = DataLoader(
         dataset, batch_size=params["train_batch_size"], shuffle=True
     )
-
-    for epoch in range(args.epochs):
+    pbar = tqdm(range(args.epochs), desc="Training", unit="epoch")
+    for epoch in pbar:
         epoch_loss = 0.0
 
         for x, y, u in dataloader:
@@ -90,8 +146,8 @@ def run_training(data, args):
 
         epoch_loss /= len(dataloader)
 
-        print(f"Epoch {epoch + 1}, Loss: {epoch_loss}")
-
+        # print(f"Epoch {epoch + 1}, Loss: {epoch_loss}")
+        pbar.set_postfix(Loss=epoch_loss, The_epoch=epoch + 1)
     ckpt_path = (
         "./policies/" + args.scenario.lower() + "_" + args.goal.lower() + "_CoIL"
     )
@@ -99,6 +155,7 @@ def run_training(data, args):
 
 
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -114,6 +171,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lr", type=float, help="learning rate for Adam optimizer", default=5e-3
     )
+
     parser.add_argument("--restore", action="store_true", default=False)
     args = parser.parse_args()
     args.goal = "all"

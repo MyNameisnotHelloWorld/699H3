@@ -7,18 +7,25 @@ from utils import *
 import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 from torch.distributions.multivariate_normal import MultivariateNormal
-
+from tqdm import tqdm
 
 class MDN(nn.Module):
     def __init__(self, in_size, out_size):
         super(MDN, self).__init__()
-
+        np.random.seed(0)
         ######### Your code starts here #########
         # We want to define and initialize the weights & biases of the neural network.
         # - in_size is dim(O)
         # - out_size is dim(A) = 2
         # IMPORTANT: out_size is still 2 in this case, because the action space is 2-dimensional. But your network will output some other size as it is outputing a distribution!
-
+        self.network = nn.Sequential(
+            nn.Linear(in_size,64),
+            nn.Sigmoid(),
+            nn.Linear(64,128),
+            nn.Sigmoid(),
+            nn.Linear(128, out_size*2)
+        )
+        self.out = out_size
         ########## Your code ends here ##########
 
     def forward(self, x):
@@ -26,9 +33,14 @@ class MDN(nn.Module):
         # We want to perform a forward-pass of the network. Using the weights and biases, this function should give the network output for x where:
         # x is a (?, |O|) tensor that keeps a batch of observations
         # IMPORTANT: First two columns of the output tensor must correspond to the mean vector!
+        output = self.network(x)
+
+        # mu = output[:,:self.out]
+        #
+        # sigma = torch.exp(output[:,self.out:])
 
         ########## Your code ends here ##########
-        return y
+        return output
 
 
 def run_training(data, args):
@@ -62,7 +74,23 @@ def run_training(data, args):
         - y is the actions the expert took for the corresponding batch of observations
         At the end your code should return the scalar loss value.
         """
+        y_pred = mdn(x)
 
+        mu = y_pred[:,:2]
+
+        sigma = torch.exp(y_pred[:,2:])
+        # print(mu.shape)
+        # print(sigma.shape)
+        # print(y.shape)
+        negative_log_likelihood = 0.5 * (torch.log(2 * torch.pi * (sigma**2+1e-5)) + (y - mu) ** 2 / sigma**2)
+        loss = torch.mean(negative_log_likelihood)
+        # if loss < 0:
+        #     # print("===================")
+        #     # print(sigma)
+        #     # print(torch.mean(sigma))
+        #     # print((y - mu) ** 2)
+        #     # print(torch.log(2 * torch.pi * sigma**2))
+        #     loss = -loss
         ########## Your code ends here ##########
         return loss
 
@@ -74,7 +102,8 @@ def run_training(data, args):
         dataset, batch_size=params["train_batch_size"], shuffle=True
     )
 
-    for epoch in range(args.epochs):
+    pbar = tqdm(range(args.epochs), desc="Training", unit="epoch")
+    for epoch in pbar:
         epoch_loss = 0.0
 
         for x, y in dataloader:
@@ -86,7 +115,8 @@ def run_training(data, args):
 
         epoch_loss /= len(dataloader)
 
-        print(f"Epoch {epoch + 1}, Loss: {epoch_loss}")
+        # print(f"Epoch {epoch + 1}, Loss: {epoch_loss}")
+        pbar.set_postfix(Loss=epoch_loss, The_epoch=epoch + 1)
 
     ckpt_path = (
         "./policies/" + args.scenario.lower() + "_" + args.goal.lower() + "_ILDIST"

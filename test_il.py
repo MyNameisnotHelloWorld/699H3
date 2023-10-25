@@ -46,7 +46,8 @@ if __name__ == "__main__":
 
     bc_model = BCModel(obs_sizes[scenario_name], 2)
     ckpt_path = "./"+args.loc+"/" + scenario_name + "_" + args.goal.lower() + "_IL"
-    bc_model.load_state_dict(torch.load(ckpt_path))
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    bc_model.load_state_dict(torch.load(ckpt_path, map_location=torch.device('cpu')))
 
     episode_number = 10 if args.visualize else 100
     success_counter = 0
@@ -76,7 +77,7 @@ if __name__ == "__main__":
             with open("success.txt",'a') as file:
                 file.write("\n"+args.loc+" "+str(float(success_counter) / episode_number))
         else:
-            with open("success.txt",'2') as file:
+            with open("success.txt",'w') as file:
                 file.write(args.loc+" "+str(float(success_counter) / episode_number))
         print("Success Rate = " + str(float(success_counter) / episode_number))
 
