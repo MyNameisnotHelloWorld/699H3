@@ -23,12 +23,13 @@ class CoIL(nn.Module):
             nn.ReLU(),
             nn.Linear(64, 128),
             nn.ReLU(),
-            nn.Linear(128, 128)
+            nn.Linear(128, out_size)
         )
 
-        self.out_net = nn.Sequential(
-            nn.Linear(129, out_size),
-            nn.Sigmoid()
+        self.c_network = nn.Sequential(
+            nn.Linear(out_size+1, 64),
+            nn.ReLU(),
+            nn.Linear(64,out_size)
         )
         ########## Your code ends here ##########
 
@@ -44,11 +45,9 @@ class CoIL(nn.Module):
 
             u = u.unsqueeze(1)
 
-        n_x = self.network(x)
-        the_x = torch.cat((n_x,u),dim=1)
-        n_x = self.out_net(the_x)
-
-        return n_x
+        new_x = self.network(x)
+        combine = torch.cat((new_x, u), dim=1)
+        return self.c_network(combine)
         ########## Your code ends here ##########
 
 
@@ -86,11 +85,11 @@ def run_training(data, args):
         HINT: Remember, you can penalize steering (0th dimension) and throttle (1st dimension) unequally
         """
         r = coil(x.to(device),u.to(device)).to(device)
-        loss_f = nn.HuberLoss()
-        # print("================")
-        # print(r)
-        # print(y)
-        loss = loss_f(r,y)
+        steer_p, thro_pred = r.split(1, dim=1)
+        steer_g, thro_g = y.split(1, dim=1)
+        sloss = (steer_g-steer_p)**2
+        tloss = (thro_g-thro_pred)**2
+        loss = torch.mean(sloss+tloss)
         ########## Your code ends here ##########
         return loss
 
