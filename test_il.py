@@ -1,6 +1,5 @@
 import numpy as np
 from train_il import BCModel
-import os
 import gym_carlo
 import gym
 import time
@@ -24,13 +23,6 @@ if __name__ == "__main__":
         help="left, straight, right, inner, outer, all",
         default="all",
     )
-
-    parser.add_argument(
-        "--loc",
-        type=str,
-        default="policies",
-    )
-
     parser.add_argument("--visualize", action="store_true", default=False)
     args = parser.parse_args()
     scenario_name = args.scenario.lower()
@@ -45,9 +37,8 @@ if __name__ == "__main__":
         )  # hmm, unreadable
 
     bc_model = BCModel(obs_sizes[scenario_name], 2)
-    ckpt_path = "./"+args.loc+"/" + scenario_name + "_" + args.goal.lower() + "_IL"
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    bc_model.load_state_dict(torch.load(ckpt_path, map_location=torch.device('cpu')))
+    ckpt_path = "./policies/" + scenario_name + "_" + args.goal.lower() + "_IL"
+    bc_model.load_state_dict(torch.load(ckpt_path))
 
     episode_number = 10 if args.visualize else 100
     success_counter = 0
@@ -73,11 +64,4 @@ if __name__ == "__main__":
                 if env.target_reached:
                     success_counter += 1
     if not args.visualize:
-        if os.path.exists("success.txt"):
-            with open("success.txt",'a') as file:
-                file.write("\n"+args.loc+" "+str(float(success_counter) / episode_number))
-        else:
-            with open("success.txt",'w') as file:
-                file.write(args.loc+" "+str(float(success_counter) / episode_number))
         print("Success Rate = " + str(float(success_counter) / episode_number))
-

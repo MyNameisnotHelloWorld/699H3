@@ -21,16 +21,18 @@ class CoIL(nn.Module):
         self.network = nn.Sequential(
             nn.Linear(in_size, 64),
             nn.ReLU(),
+            nn.Dropout(0.2),
             nn.Linear(64, 128),
             nn.ReLU(),
-            nn.Linear(128, out_size)
+            nn.Linear(128, 256),
         )
 
-        self.c_network = nn.Sequential(
-            nn.Linear(out_size+1, 64),
+        the_part = nn.Sequential(
+            nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Linear(64,out_size)
+            nn.Linear(128, out_size),
         )
+        self.branches = nn.ModuleList([the_part,the_part,the_part])
         ########## Your code ends here ##########
 
     def forward(self, x, u):
@@ -45,9 +47,15 @@ class CoIL(nn.Module):
 
             u = u.unsqueeze(1)
 
-        new_x = self.network(x)
-        combine = torch.cat((new_x, u), dim=1)
-        return self.c_network(combine)
+        the_x = self.network(x)
+        selected_output = torch.stack([branch(the_x) for branch in self.branches])
+        mask = torch.zeros(selected_output)
+        mask[torch.arange(len(u)),u.long()] = 1
+
+        selected_output = selected_output * mask.unsqueeze(-1)
+        selected_output = torch.sum(selected_output,dim=1)
+        print(selected_output.shape)
+        return selected_output
         ########## Your code ends here ##########
 
 
@@ -85,11 +93,17 @@ def run_training(data, args):
         HINT: Remember, you can penalize steering (0th dimension) and throttle (1st dimension) unequally
         """
         r = coil(x.to(device),u.to(device)).to(device)
+        # l_func = nn.HuberLoss()
+        # loss = l_func(r, y)
         steer_p, thro_pred = r.split(1, dim=1)
         steer_g, thro_g = y.split(1, dim=1)
         sloss = (steer_g-steer_p)**2
         tloss = (thro_g-thro_pred)**2
-        loss = torch.mean(sloss+tloss)
+        loss = torch.mean((sloss+tloss))
+        # y_est = coil(x, u)
+        # # print(y_est.shape)
+        # l_func = nn.HuberLoss()
+        # loss = l_func(y_est, y)
         ########## Your code ends here ##########
         return loss
 

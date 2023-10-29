@@ -68,6 +68,23 @@ if __name__ == "__main__":
             # - action (1 x 2 numpy array) is the current action the user took when the observation is obs
             # The code should set a variable called "probs" which is list keeping the probabilities associated with goals[scenario_name], respectively.
             # HINT: multivariate_normal from scipy.stats might be useful, which is already imported. Or you can implement it yourself, too.
+            probs = []
+            for goal in goals[scenario_name]:
+                model = mdns[goal]
+                obs_tensor = torch.tensor(obs, dtype=torch.float32)
+                action_tensor = torch.tensor(action, dtype=torch.float32)
+                pre = model(obs_tensor)
+                mu = pre[:, :2]
+
+                sigma = torch.exp(pre[:, 2:])
+
+                mvn = multivariate_normal(mean=mu.detach().numpy().squeeze(), cov=sigma.detach().numpy().squeeze())
+
+                action = np.array(action)
+                action_2d = action.reshape(1, -1)
+                prob = mvn.pdf(action_2d)
+
+                probs.append(prob)
 
             ########## Your code ends here ##########
 

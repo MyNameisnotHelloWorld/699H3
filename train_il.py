@@ -1,12 +1,12 @@
 import numpy as np
 import argparse
-from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from utils import *
 import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
+from tqdm import tqdm
 
 
 class BCModel(nn.Module):
@@ -17,16 +17,11 @@ class BCModel(nn.Module):
         # We want to define and initialize the weights & biases of the neural network.
         # - in_size is dim(O)
         # - out_size is dim(A) = 2
-        if int(in_size/2) >=1:
-            hidden = int(in_size/2)
-        else:
-            hidden = in_size
         self.layer1 = nn.Linear(in_size, 128)
         self.act1 = nn.ReLU()
-        self.layer2 = nn.Linear(128,256)
+        self.layer2 = nn.Linear(128, 256)
         self.act2 = nn.ReLU()
         self.layer3 = nn.Linear(256, out_size)
-
         ########## Your code ends here ##########
 
     def forward(self, x):
@@ -42,7 +37,7 @@ class BCModel(nn.Module):
         ########## Your code ends here ##########
 
 
-def run_training(data, args, dir_name,device):
+def run_training(data, args):
     """
     Trains a feedforward NN.
     """
@@ -55,11 +50,11 @@ def run_training(data, args, dir_name,device):
     in_size = data["x_train"].shape[-1]
     out_size = data["y_train"].shape[-1]
 
-    bc_model = BCModel(in_size, out_size).to(device)
+    bc_model = BCModel(in_size, out_size)
 
     if args.restore:
         ckpt_path = (
-            dir_name+"/" + args.scenario.lower() + "_" + args.goal.lower() + "_IL"
+            "./policies/" + args.scenario.lower() + "_" + args.goal.lower() + "_IL"
         )
         bc_model.load_state_dict(torch.load(ckpt_path))
 
@@ -79,21 +74,18 @@ def run_training(data, args, dir_name,device):
         At the end your code should return the scalar loss value.
         HINT: Remember, you can penalize steering (0th dimension) and throttle (1st dimension) unequally
         """
-        x = x.to(device)
+        x = x
         y_est = bc_model(x)
 
-        if args.loss == "Huber":
 
-            loss_f = nn.HuberLoss()
-        elif args.loss == "Cross_Entropy":
 
-            loss_f = nn.CrossEntropyLoss()
-        else:
+        loss_f = nn.HuberLoss()
 
-            loss_f = nn.MSELoss()
-        loss = loss_f(y_est.to(device),y.to(device))
+        loss = loss_f(y_est, y)
         ########## Your code ends here ##########
         return loss
+
+
 
     # load dataset
     dataset = TensorDataset(
@@ -118,16 +110,12 @@ def run_training(data, args, dir_name,device):
         epoch_loss /= len(dataloader)
 
         # print(f"Epoch {epoch + 1}, Loss: {epoch_loss}")
-        pbar.set_postfix(Loss=epoch_loss,The_epoch=epoch+1)
-
-    ckpt_path = dir_name+"/" + args.scenario.lower() + "_" + args.goal.lower() + "_IL"
+        pbar.set_postfix(Loss=epoch_loss, The_epoch=epoch + 1)
+    ckpt_path = "./policies/" + args.scenario.lower() + "_" + args.goal.lower() + "_IL"
     torch.save(bc_model.state_dict(), ckpt_path)
 
 
 if __name__ == "__main__":
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -149,16 +137,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lr", type=float, help="learning rate for Adam optimizer", default=5e-3
     )
-
-    parser.add_argument(
-        "--loss", type=str, help="MSE, Cross_Entropy, Huber", default="MSE"
-    )
-
     parser.add_argument("--restore", action="store_true", default=False)
     args = parser.parse_args()
-    dir_name = "./"+str(args.epochs)+"_epochs_"+str(args.lr)+"_lr_"+str(args.loss)+"_"+str(args.goal)+"_loss_policies"
-    maybe_makedirs(dir_name)
+
+    maybe_makedirs("./policies")
 
     data = load_data(args)
 
-    run_training(data, args, dir_name,device)
+    run_training(data, args)
